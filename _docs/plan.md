@@ -15,7 +15,7 @@ This document defines the precise product scope and initial technical specificat
 | **Review & Alerts** | Dashboard + Real-Time Alerts | Central dashboard for metrics/trends + immediate chat notifications for flagged blockers. |
 | **Interface** | Chat-First (Slack/Teams Bot) | Interactive chat bot handles check-in prompts, modals, and reminder nudges natively. |
 | **Schedule** | Asynchronous / On-Demand | Flexible submission anytime during the check-in window; targeted nudges prior to cutoff. |
-| **Tech Stack** | Full-Stack Custom | Custom backend, official Chat API SDKs (e.g., Slack Bolt), custom SQL database, and web dashboard. |
+| **Tech Stack** | Django (Selected Option 2) | Django backend and templates, HTMX, Chart.js, PostgreSQL, Django ORM, Django Q2, and Slack Bolt for Python. |
 
 ---
 
@@ -40,24 +40,47 @@ This document defines the precise product scope and initial technical specificat
 
 ## 4. Technical Architecture Plan
 
+### Selected Stack: Option 2 — Django
+
+| Component | Selected Technology | Responsibility |
+| :--- | :--- | :--- |
+| Backend and dashboard | Django | Business logic, webhook endpoints, and server-rendered dashboard views. |
+| Interactive UI | Django templates + HTMX | Forms, filters, pagination, and partial page updates. |
+| Charts | Chart.js | Progress, workload, and morale trends. |
+| Database | PostgreSQL | Persistent application data and background job broker. |
+| Models and migrations | Django ORM | Data access, relationships, constraints, and schema migrations. |
+| Background jobs and scheduling | Django Q2 with the Django ORM broker | Feedback windows, targeted reminders, and blocker notifications. |
+| Initial chat integration | Slack Bolt for Python | Slack commands, interactive modals, and action handlers. |
+| Administration | Django Admin | Manage projects, memberships, and feedback cycles. |
+| Authentication | Django sessions | Dashboard sign-in, with company SSO integration if required. |
+
+This stack was selected for efficient internal-tool development, using Django's built-in authentication, ORM, and administration alongside a custom manager dashboard. The web application and Django Q2 worker will run as separate processes from one repository and share PostgreSQL. Redis is not required for the selected database-backed broker.
+
+Slack is the initial integration assumption. Microsoft Teams remains a possible follow-up integration and requires its own SDK and interaction handlers; Slack Bolt does not support Teams. Project-level permissions must be enforced in backend queries for access to individual feedback.
+
 ```
-                   +---------------------------------------+
-                   |       Slack / MS Teams Clients        |
-                   +-------------------+-------------------+
-                                       |
-                         Webhook / Bolt SDK Events
-                                       v
-                   +---------------------------------------+
-                   |          Backend API Service          |
-                   |    (Node.js / Express or Python)     |
-                   +---------+-------------------+---------+
-                             |                   |
-               Database Queries                 REST / GraphQL API
-                             v                   v
-                   +-------------------+   +---------------+
-                   |    PostgreSQL     |   | Next.js / React|
-                   |     Database      |   | Admin Dashboard|
-                   +-------------------+   +---------------+
+ Slack Clients                         Dashboard Browser
+      |                                       |
+      | Webhooks                              | HTML / HTMX / Chart JSON
+      v                                       v
+ +--------------------------------------------------------+
+ | Django Application                                     |
+ | Slack Bolt for Python | Templates + HTMX | Django Admin |
+ | Business Logic | Session Auth | Project Permissions     |
+ +---------------------------+----------------------------+
+                             | Django ORM
+                             v
+ +--------------------------------------------------------+
+ | PostgreSQL: Application Data + Django Q2 ORM Broker     |
+ +---------------------------+----------------------------+
+                             ^
+                             | Jobs / Schedules / Data
+ +---------------------------+----------------------------+
+ | Django Q2 Worker: Windows, Reminders, Blocker Alerts    |
+ +---------------------------+----------------------------+
+                             | Slack API
+                             v
+                        Slack Clients
 ```
 
 ### 4.1 Data Models (Database Schema Draft)
@@ -106,30 +129,36 @@ This document defines the precise product scope and initial technical specificat
 ## 5. API & Integration Endpoints
 
 ### 5.1 Chat Webhooks / Slack Bolt Handlers
-* `POST /api/slack/events` - Handles slash commands, interactive buttons, and modal submissions.
-* `POST /api/slack/actions` - Processes blocker resolution button clicks.
+* `POST /api/slack/events` - Django endpoint using the Slack Bolt for Python adapter for events, slash commands, interactive buttons, and modal submissions. Configure the relevant Slack request URLs to use this endpoint.
+* Blocker acknowledgment and resolution buttons are routed to Bolt action handlers through the same endpoint.
+* Acknowledge Slack interactions promptly; enqueue notification delivery through Django Q2.
 
-### 5.2 Dashboard REST API
-* `GET /api/v1/projects` - List active projects and member counts.
-* `GET /api/v1/projects/:id/metrics` - Fetch aggregated ratings (morale, workload, progress) over custom date ranges.
-* `GET /api/v1/projects/:id/blockers` - Retrieve recent and unresolved blockers.
-* `GET /api/v1/submissions` - Paginated list of historical weekly entries.
+### 5.2 Dashboard Views and Chart Data
+* `GET /projects/` - Django template listing active projects and member counts.
+* `GET /projects/<uuid:project_id>/` - Custom project dashboard with HTMX filters and Chart.js visualizations.
+* `GET /projects/<uuid:project_id>/metrics/` - JSON containing aggregated ratings over custom date ranges for Chart.js.
+* `GET /projects/<uuid:project_id>/blockers/` - HTML page or HTMX partial showing recent and unresolved blockers.
+* `GET /submissions/` - Paginated historical entries rendered as HTML or an HTMX partial.
+* `/admin/` - Django Admin for authorized administrative users.
+
+All dashboard views and chart endpoints require authentication and project-level authorization. The initial dashboard uses Django views rather than a separate frontend application or GraphQL API.
 
 ---
 
 ## 6. Implementation Roadmap
 
-### Phase 1: Core Bot & Database (Weeks 1–2)
-* Setup PostgreSQL database and ORM migrations.
-* Build Slack/Teams Bolt application setup.
+### Phase 1: Core Bot & Database
+* Set up the Django project, PostgreSQL database, and Django ORM models and migrations.
+* Register projects, memberships, and feedback cycles in Django Admin.
+* Configure the Slack application and Slack Bolt for Python integration with Django.
 * Implement Modal form creation & submission handling.
 
-### Phase 2: Reminders & Escalations (Weeks 3–4)
-* Configure scheduled background cron jobs (e.g., BullMQ / Celery).
+### Phase 2: Reminders & Escalations
+* Configure Django Q2 scheduling and a separate worker process using PostgreSQL through the Django ORM broker.
 * Build targeted logic for missing submission nudges.
 * Develop real-time blocker notification routing to project leads.
 
-### Phase 3: Web Dashboard (Weeks 5–6)
-* Develop Next.js / React analytics dashboard.
-* Build chart visualizers for workload and morale trends across sprints/weeks.
-* Implement authentication (OAuth / SSO) for leads and admins.
+### Phase 3: Web Dashboard 
+* Develop the custom analytics dashboard using Django templates and HTMX.
+* Build Chart.js visualizations for progress, workload, and morale trends across sprints/weeks.
+* Implement Django session authentication and project-level permissions for leads and admins; integrate company SSO if required.
