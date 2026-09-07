@@ -1,0 +1,19 @@
+[project]
+name = "weekly-project-feedback"
+version = "0.1.0"
+description = "Chat-first weekly project feedback tool."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.1,<6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-django>=4.9,<5.0",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "weekly_feedback.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
