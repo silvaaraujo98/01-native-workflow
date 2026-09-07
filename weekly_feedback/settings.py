@@ -1,12 +1,44 @@
 """Django settings for the weekly feedback project."""
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "development-only-secret-key"
-DEBUG = True
-ALLOWED_HOSTS: list[str] = []
+
+def env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: list[str]) -> list[str]:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def database_config_from_env() -> dict[str, object]:
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB", "weekly_feedback"),
+        "USER": os.environ.get("POSTGRES_USER", "weekly_feedback"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "weekly_feedback"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "TEST": {
+            "NAME": os.environ.get("POSTGRES_TEST_DB", "test_weekly_feedback"),
+        },
+    }
+
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "development-only-secret-key")
+DEBUG = env_bool("DJANGO_DEBUG", True)
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", [])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -46,12 +78,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "weekly_feedback.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+DATABASES = {"default": database_config_from_env()}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
