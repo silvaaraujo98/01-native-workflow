@@ -33,6 +33,9 @@ def database_config_from_env() -> dict[str, object]:
         "TEST": {
             "NAME": os.environ.get("POSTGRES_TEST_DB", "test_weekly_feedback"),
         },
+        "OPTIONS": {
+            "connect_timeout": int(os.environ.get("POSTGRES_CONNECT_TIMEOUT", "5")),
+        },
     }
 
 

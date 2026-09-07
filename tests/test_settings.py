@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import connection
 
 from weekly_feedback.settings import database_config_from_env
 
@@ -16,6 +17,7 @@ def test_database_config_uses_postgresql_environment(monkeypatch):
     monkeypatch.setenv("POSTGRES_HOST", "postgres")
     monkeypatch.setenv("POSTGRES_PORT", "5433")
     monkeypatch.setenv("POSTGRES_TEST_DB", "feedback_test")
+    monkeypatch.setenv("POSTGRES_CONNECT_TIMEOUT", "2")
 
     config = database_config_from_env()
 
@@ -29,4 +31,16 @@ def test_database_config_uses_postgresql_environment(monkeypatch):
         "TEST": {
             "NAME": "feedback_test",
         },
+        "OPTIONS": {
+            "connect_timeout": 2,
+        },
     }
+
+
+def test_django_can_create_and_query_the_test_database(db):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1")
+        row = cursor.fetchone()
+
+    assert connection.vendor == "postgresql"
+    assert row == (1,)

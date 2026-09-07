@@ -27,6 +27,7 @@ $env:POSTGRES_PASSWORD = "weekly_feedback"
 $env:POSTGRES_HOST = "localhost"
 $env:POSTGRES_PORT = "5432"
 $env:POSTGRES_TEST_DB = "test_weekly_feedback"
+$env:POSTGRES_CONNECT_TIMEOUT = "5"
 ```
 
 ## PostgreSQL
@@ -38,6 +39,17 @@ createdb weekly_feedback
 createdb test_weekly_feedback
 ```
 
+If you prefer Docker, start a local PostgreSQL container with the same credentials:
+
+```powershell
+docker run --name weekly-feedback-postgres `
+  -e POSTGRES_DB=weekly_feedback `
+  -e POSTGRES_USER=weekly_feedback `
+  -e POSTGRES_PASSWORD=weekly_feedback `
+  -p 5432:5432 `
+  -d postgres:17
+```
+
 The default local connection uses:
 
 ```text
@@ -47,6 +59,7 @@ POSTGRES_PASSWORD=weekly_feedback
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 POSTGRES_TEST_DB=test_weekly_feedback
+POSTGRES_CONNECT_TIMEOUT=5
 ```
 
 Application model migrations begin in the custom user task. This setup task intentionally does not add application migrations before the custom user model exists.
